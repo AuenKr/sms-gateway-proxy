@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"sort"
@@ -12,7 +14,6 @@ import (
 	"go.uber.org/fx"
 
 	"sms-gateway/internal/config"
-	"sms-gateway/internal/gateway"
 )
 
 type Route interface {
@@ -102,8 +103,8 @@ func RegisterServer(lifecycle fx.Lifecycle, cfg config.Config, handler http.Hand
 	})
 }
 
-func decodeJSONStrict(r *http.Request, dst any) error {
-	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+func DecodeJSONStrict(r *http.Request, dst any) error {
+	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
 		return err
@@ -114,30 +115,26 @@ func decodeJSONStrict(r *http.Request, dst any) error {
 	return nil
 }
 
-func DecodeJSONStrict(r *http.Request, dst any) error {
-	return decodeJSONStrict(r, dst)
-}
-
-func writeJSON(w http.ResponseWriter, status int, payload any) {
+func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
-}
-
-func WriteJSON(w http.ResponseWriter, status int, payload any) {
-	writeJSON(w, status, payload)
-}
-
-func writeGatewayResponse(w http.ResponseWriter, response gateway.Response) {
-	contentType := response.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/json"
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		fmt.Printf("error encoding json: %s", err)
 	}
-	w.Header().Set("Content-Type", contentType)
-	w.WriteHeader(response.StatusCode)
-	_, _ = w.Write(response.Body)
 }
 
-func WriteGatewayResponse(w http.ResponseWriter, response gateway.Response) {
-	writeGatewayResponse(w, response)
+func WriteGatewayResponse(w http.ResponseWriter, response *http.Response) {
+	defer response.Body.Close()
+
+	for key, values := range response.Header {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+
+	w.WriteHeader(response.StatusCode)
+	_, err := io.Copy(w, response.Body)
+	if err != nil {
+		log.Printf("error copying response body: %s", err)
+	}
 }

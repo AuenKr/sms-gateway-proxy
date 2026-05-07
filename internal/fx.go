@@ -20,9 +20,9 @@ var Module = fx.Provide(
 	httpapi.NewHandler,
 	middleware.NewLogger,
 	middleware.NewAuthorization,
+	fx.Annotate(middleware.NewContentLengthValidation, fx.ResultTags(`group:"middlewares"`)),
 	fx.Annotate(middleware.NewRequestLogging, fx.ResultTags(`group:"middlewares"`)),
 	fx.Annotate(route.NewHealthEndpoint, fx.ResultTags(`group:"routes"`)),
-	fx.Annotate(route.NewDevicesEndpoint, fx.ResultTags(`group:"routes"`)),
 	fx.Annotate(route.NewMessagesEndpoint, fx.ResultTags(`group:"routes"`)),
-	fx.Annotate(route.NewWebhooksEndpoint, fx.ResultTags(`group:"routes"`)),
+	fx.Annotate(route.NewProxyEndpoint, fx.ResultTags(`group:"routes"`)),
 )

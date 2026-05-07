@@ -1,17 +1,18 @@
 package config
 
 import (
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 const (
 	DefaultPort       = "8080"
-	DefaultIterations = 75000
+	DefaultIterations = 1400000
 )
 
 type Config struct {
@@ -22,9 +23,11 @@ type Config struct {
 	ServerAuthKey  string
 	Port           string
 	Iterations     int
+	DevMode        bool
 }
 
 func Load() (Config, error) {
+	_ = godotenv.Load()
 	iterations := DefaultIterations
 	if value := strings.TrimSpace(os.Getenv("PBKDF2_ITERATIONS")); value != "" {
 		parsed, err := strconv.Atoi(value)
@@ -34,14 +37,24 @@ func Load() (Config, error) {
 		iterations = parsed
 	}
 
+	devMode := false
+	if value := strings.TrimSpace(os.Getenv("DEV_MODE")); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return Config{}, errors.New("DEV_MODE must be true or false")
+		}
+		devMode = parsed
+	}
+
 	cfg := Config{
 		GatewayBaseURL: strings.TrimSpace(os.Getenv("GATEWAY_BASE_URL")),
 		Username:       strings.TrimSpace(os.Getenv("USERNAME")),
 		Password:       os.Getenv("PASSWORD"),
-		Passphrase:     os.Getenv("PRIVATE_KEY"),
+		Passphrase:     os.Getenv("PASSPHRASE_KEY"),
 		ServerAuthKey:  strings.TrimSpace(os.Getenv("SERVER_AUTH_KEY")),
 		Port:           strings.TrimSpace(os.Getenv("PORT")),
 		Iterations:     iterations,
+		DevMode:        devMode,
 	}
 
 	if cfg.Port == "" {
@@ -59,7 +72,7 @@ func Load() (Config, error) {
 		missing = append(missing, "PASSWORD")
 	}
 	if cfg.Passphrase == "" {
-		missing = append(missing, "PRIVATE_KEY")
+		missing = append(missing, "PASSPHRASE_KEY")
 	}
 	if cfg.ServerAuthKey == "" {
 		missing = append(missing, "SERVER_AUTH_KEY")
@@ -69,11 +82,4 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
-}
-
-func (c Config) HasServerAuthorization(value string) bool {
-	if len(value) != len(c.ServerAuthKey) {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(value), []byte(c.ServerAuthKey)) == 1
 }

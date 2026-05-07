@@ -38,9 +38,3 @@ type GatewaySendRequest struct {
 	ValidUntil         string       `json:"validUntil,omitempty"`
 	WithDeliveryReport *bool        `json:"withDeliveryReport,omitempty"`
 }
-
-type RegisterWebhookRequest struct {
-	URL      string `json:"url"`
-	Event    string `json:"event"`
-	DeviceID string `json:"device_id,omitempty"`
-}

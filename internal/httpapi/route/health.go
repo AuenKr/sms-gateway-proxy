@@ -15,7 +15,7 @@ func NewHealthEndpoint() httpapi.Route {
 }
 
 func (e *HealthEndpoint) Register(mux *http.ServeMux) {
-	httpapi.Handle(mux, "GET /healthz", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	httpapi.Handle(mux, "GET /health", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		httpapi.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}), e.Middlewares())
 }
