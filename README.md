@@ -40,6 +40,17 @@ Optional values:
 
 ## Run
 
+Docker image: `auenkr/sms-gateway-proxy`
+
+### Run with Docker
+
+```bash
+docker pull auenkr/sms-gateway-proxy:latest
+docker run --env-file .env -p 8080:8080 auenkr/sms-gateway-proxy:latest
+```
+
+### Run locally
+
 ```bash
 go run ./cmd/sms-gateway
 ```
