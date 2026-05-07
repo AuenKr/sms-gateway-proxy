@@ -5,6 +5,8 @@ import (
 
 	"sms-gateway/internal/gateway"
 	"sms-gateway/internal/httpapi"
+
+	"go.uber.org/fx"
 )
 
 type ProxyEndpoint struct {
@@ -12,8 +14,26 @@ type ProxyEndpoint struct {
 	middlewares []httpapi.Middleware
 }
 
-func NewProxyEndpoint(gatewayClient *gateway.Client, authorization httpapi.Middleware) httpapi.Route {
-	return &ProxyEndpoint{gateway: gatewayClient, middlewares: []httpapi.Middleware{authorization}}
+type NewProxyEndpointParams struct {
+	fx.In
+
+	GatewayClient *gateway.Client
+	Authorization httpapi.Middleware
+}
+
+type NewProxyEndpointResult struct {
+	fx.Out
+
+	Route httpapi.Route `group:"routes"`
+}
+
+func NewProxyEndpoint(in NewProxyEndpointParams) NewProxyEndpointResult {
+	return NewProxyEndpointResult{
+		Route: &ProxyEndpoint{
+			gateway:     in.GatewayClient,
+			middlewares: []httpapi.Middleware{in.Authorization},
+		},
+	}
 }
 
 func (e *ProxyEndpoint) Register(mux *http.ServeMux) {

@@ -28,18 +28,29 @@ type OrderedMiddleware struct {
 	Middleware Middleware
 }
 
-func NewServeMux() *http.ServeMux {
-	return http.NewServeMux()
+type NewServeMuxResult struct {
+	fx.Out
+
+	Mux *http.ServeMux
+}
+
+func NewServeMux() NewServeMuxResult {
+	return NewServeMuxResult{Mux: http.NewServeMux()}
 }
 
 type middlewareParams struct {
 	fx.In
 
 	Mux         *http.ServeMux
-	Middlewares []OrderedMiddleware `group:"middlewares"`
+	Middlewares []OrderedMiddleware `group:"global_middleware"`
+}
+type NewHandlerResult struct {
+	fx.Out
+
+	Handler http.Handler
 }
 
-func NewHandler(params middlewareParams) http.Handler {
+func NewHandler(params middlewareParams) NewHandlerResult {
 	sort.SliceStable(params.Middlewares, func(i, j int) bool {
 		return params.Middlewares[i].Order < params.Middlewares[j].Order
 	})
@@ -49,7 +60,7 @@ func NewHandler(params middlewareParams) http.Handler {
 		middlewares = append(middlewares, entry.Middleware)
 	}
 
-	return ApplyMiddlewares(params.Mux, middlewares)
+	return NewHandlerResult{Handler: ApplyMiddlewares(params.Mux, middlewares)}
 }
 
 func ApplyMiddlewares(handler http.Handler, middlewares []Middleware) http.Handler {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
+	"go.uber.org/fx"
 )
 
 const (
@@ -26,13 +27,19 @@ type Config struct {
 	DevMode        bool
 }
 
-func Load() (Config, error) {
+type LoadResult struct {
+	fx.Out
+
+	Config Config
+}
+
+func Load() (LoadResult, error) {
 	_ = godotenv.Load()
 	iterations := DefaultIterations
 	if value := strings.TrimSpace(os.Getenv("PBKDF2_ITERATIONS")); value != "" {
 		parsed, err := strconv.Atoi(value)
 		if err != nil || parsed <= 0 {
-			return Config{}, errors.New("PBKDF2_ITERATIONS must be a positive integer")
+			return LoadResult{}, errors.New("PBKDF2_ITERATIONS must be a positive integer")
 		}
 		iterations = parsed
 	}
@@ -41,7 +48,7 @@ func Load() (Config, error) {
 	if value := strings.TrimSpace(os.Getenv("DEV_MODE")); value != "" {
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
-			return Config{}, errors.New("DEV_MODE must be true or false")
+			return LoadResult{}, errors.New("DEV_MODE must be true or false")
 		}
 		devMode = parsed
 	}
@@ -78,8 +85,8 @@ func Load() (Config, error) {
 		missing = append(missing, "SERVER_AUTH_KEY")
 	}
 	if len(missing) > 0 {
-		return Config{}, fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
+		return LoadResult{}, fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 
-	return cfg, nil
+	return LoadResult{Config: cfg}, nil
 }

@@ -10,6 +10,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"go.uber.org/fx"
+
 	"sms-gateway/internal/config"
 )
 
@@ -20,8 +22,20 @@ type Encryptor struct {
 	iterations int
 }
 
-func New(cfg config.Config) *Encryptor {
-	return &Encryptor{passphrase: cfg.Passphrase, iterations: cfg.Iterations}
+type NewParams struct {
+	fx.In
+
+	Config config.Config
+}
+
+type NewResult struct {
+	fx.Out
+
+	Encryptor *Encryptor
+}
+
+func New(in NewParams) NewResult {
+	return NewResult{Encryptor: &Encryptor{passphrase: in.Config.Passphrase, iterations: in.Config.Iterations}}
 }
 
 func (e *Encryptor) Encrypt(plainText string) (string, error) {

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/fx"
+
 	"sms-gateway/internal/config"
 )
 
@@ -19,16 +21,37 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func NewHTTPClient() *http.Client {
-	return &http.Client{Timeout: DefaultHTTPTimeout}
+type NewHTTPClientResult struct {
+	fx.Out
+
+	HTTPClient *http.Client
 }
 
-func NewClient(cfg config.Config, httpClient *http.Client) *Client {
-	return &Client{
-		baseURL:    strings.TrimRight(cfg.GatewayBaseURL, "/"),
-		username:   cfg.Username,
-		password:   cfg.Password,
-		httpClient: httpClient,
+func NewHTTPClient() NewHTTPClientResult {
+	return NewHTTPClientResult{HTTPClient: &http.Client{Timeout: DefaultHTTPTimeout}}
+}
+
+type NewClientParams struct {
+	fx.In
+
+	Config     config.Config
+	HTTPClient *http.Client
+}
+
+type NewClientResult struct {
+	fx.Out
+
+	Client *Client
+}
+
+func NewClient(in NewClientParams) NewClientResult {
+	return NewClientResult{
+		Client: &Client{
+			baseURL:    strings.TrimRight(in.Config.GatewayBaseURL, "/"),
+			username:   in.Config.Username,
+			password:   in.Config.Password,
+			httpClient: in.HTTPClient,
+		},
 	}
 }
 

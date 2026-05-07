@@ -3,6 +3,8 @@ package route
 import (
 	"net/http"
 
+	"go.uber.org/fx"
+
 	"sms-gateway/internal/httpapi"
 )
 
@@ -10,8 +12,14 @@ type HealthEndpoint struct {
 	middlewares []httpapi.Middleware
 }
 
-func NewHealthEndpoint() httpapi.Route {
-	return &HealthEndpoint{}
+type NewHealthEndpointResult struct {
+	fx.Out
+
+	Route httpapi.Route `group:"routes"`
+}
+
+func NewHealthEndpoint() NewHealthEndpointResult {
+	return NewHealthEndpointResult{Route: &HealthEndpoint{}}
 }
 
 func (e *HealthEndpoint) Register(mux *http.ServeMux) {

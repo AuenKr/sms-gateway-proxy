@@ -3,13 +3,13 @@ package route
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
-	"time"
+
+	"github.com/go-playground/validator/v10"
+	"go.uber.org/fx"
 
 	"sms-gateway/internal/config"
 	"sms-gateway/internal/encryption"
@@ -22,12 +22,37 @@ const messagesPath = "/messages"
 type MessagesEndpoint struct {
 	gateway     *gateway.Client
 	encryptor   *encryption.Encryptor
+	validate    *validator.Validate
 	devMode     bool
 	middlewares []httpapi.Middleware
 }
 
-func NewMessagesEndpoint(gatewayClient *gateway.Client, encryptor *encryption.Encryptor, cfg config.Config, authorization httpapi.Middleware) httpapi.Route {
-	return &MessagesEndpoint{gateway: gatewayClient, encryptor: encryptor, devMode: cfg.DevMode, middlewares: []httpapi.Middleware{authorization}}
+type NewMessagesEndpointParams struct {
+	fx.In
+
+	GatewayClient *gateway.Client
+	Encryptor     *encryption.Encryptor
+	Validate      *validator.Validate
+	Config        config.Config
+	Authorization httpapi.Middleware
+}
+
+type NewMessagesEndpointResult struct {
+	fx.Out
+
+	Route httpapi.Route `group:"routes"`
+}
+
+func NewMessagesEndpoint(in NewMessagesEndpointParams) NewMessagesEndpointResult {
+	return NewMessagesEndpointResult{
+		Route: &MessagesEndpoint{
+			gateway:     in.GatewayClient,
+			encryptor:   in.Encryptor,
+			validate:    in.Validate,
+			devMode:     in.Config.DevMode,
+			middlewares: []httpapi.Middleware{in.Authorization},
+		},
+	}
 }
 
 func (e *MessagesEndpoint) Register(mux *http.ServeMux) {
@@ -47,7 +72,7 @@ func (e *MessagesEndpoint) enqueueMessage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := validateSendSMSRequest(req); err != nil {
+	if err := e.validate.Struct(req); err != nil {
 		httpapi.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
@@ -79,63 +104,6 @@ func (e *MessagesEndpoint) enqueueMessage(w http.ResponseWriter, r *http.Request
 	}
 
 	httpapi.WriteGatewayResponse(w, response)
-}
-
-func validateSendSMSRequest(req httpapi.SendSMSRequest) error {
-	if len(req.PhoneNumbers) == 0 {
-		return errors.New("phoneNumbers is required")
-	}
-
-	for _, number := range req.PhoneNumbers {
-		if strings.TrimSpace(number) == "" {
-			return errors.New("phoneNumbers cannot contain empty values")
-		}
-	}
-
-	messageKinds := 0
-	if strings.TrimSpace(req.Message) != "" {
-		messageKinds++
-	}
-	if req.TextMessage != nil {
-		messageKinds++
-		if strings.TrimSpace(req.TextMessage.Text) == "" {
-			return errors.New("textMessage.text is required when textMessage is provided")
-		}
-	}
-	if req.DataMessage != nil {
-		messageKinds++
-		if strings.TrimSpace(req.DataMessage.Data) == "" {
-			return errors.New("dataMessage.data is required when dataMessage is provided")
-		}
-		if req.DataMessage.Port < 0 || req.DataMessage.Port > 65535 {
-			return errors.New("dataMessage.port must be between 0 and 65535")
-		}
-	}
-
-	if messageKinds == 0 {
-		return errors.New("exactly one of message, textMessage, or dataMessage is required")
-	}
-	if messageKinds > 1 {
-		return errors.New("only one of message, textMessage, or dataMessage may be provided")
-	}
-
-	if req.TTL != nil && req.ValidUntil != "" {
-		return errors.New("ttl and validUntil are mutually exclusive")
-	}
-
-	if req.ScheduleAt != "" {
-		if _, err := time.Parse(time.RFC3339, req.ScheduleAt); err != nil {
-			return errors.New("scheduleAt must be RFC3339 format")
-		}
-	}
-
-	if req.ValidUntil != "" {
-		if _, err := time.Parse(time.RFC3339, req.ValidUntil); err != nil {
-			return errors.New("validUntil must be RFC3339 format")
-		}
-	}
-
-	return nil
 }
 
 func (e *MessagesEndpoint) buildGatewayPayload(req httpapi.SendSMSRequest) (httpapi.GatewaySendRequest, error) {
